@@ -413,6 +413,9 @@ FodyWeavers.xsd
 # Windows Installer files from build outputs
 *.cab
 *.msi
+
+bin/
+obj/
 *.msix
 *.msm
 *.msp
