@@ -1,7 +1,14 @@
 ﻿using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
+using Sebo_Andy.DTOs;
 using Sebo_Andy.Models;
 using Sebo_Andy.Data;
+using Sebo_Andy.Services;
+using Microsoft.Identity.Client;
+using System.Reflection.Metadata.Ecma335;
+using Microsoft.AspNetCore.Http.HttpResults;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Sebo_Andy.Controllers
 {
@@ -10,16 +17,29 @@ namespace Sebo_Andy.Controllers
 	public class UsuariosController : ControllerBase
 	{
 		private readonly AppDbContext _context;
+		private readonly AuthServices _auth;
 
-		public UsuariosController(AppDbContext context)
+		public UsuariosController(AppDbContext context, AuthServices auth)
 		{
 			_context = context;
+			_auth = auth;
 		}
 
 		[HttpGet]
-		public ActionResult<List<Usuario>> GetTodos()
-		{			
-			return Ok(_context.Usuarios.ToList());
+		public ActionResult GetTodos([FromHeader] int adminId)
+		{
+			// Verifica cargo do usuario
+			if (_auth.EhAdmin(adminId))
+			{
+				return Ok(_context.Usuarios.ToList());
+			};
+
+			var usuariosDto = _context.Usuarios
+				.ToList()
+				.Select(u => new UsuarioGetDto{ Nome = u.Nome})
+				.ToList();
+			
+			return Ok(usuariosDto);
 		}
 
 		[HttpGet("{id:int}")]
@@ -30,7 +50,11 @@ namespace Sebo_Andy.Controllers
 			{
 				return NotFound("Usuário não encontrado!");
 			}
-			return Ok(new {mensagem = "Usuário Encontrado", usuario });
+
+			TipoCargo dados = usuario.Cargo;
+			string nomeCargo = dados.ToString();
+
+			return Ok(new { mensagem = "Usuário Encontrado", usuario, nomeCargo});
 		}
 
 		[HttpPost]
@@ -50,6 +74,7 @@ namespace Sebo_Andy.Controllers
 			{
 				return NotFound($"Usuário de Id {id} não encontrado!");
 			}
+
 			_context.Usuarios.Remove(removerUsuario);
 			_context.SaveChanges();
 			return Ok(new {mensagem = $"Usuário de Id {id} foi removido com sucesso!", removerUsuario});
