@@ -23,35 +23,45 @@ namespace Sebo_Andy.Controllers
 
 		// Lista todos os livros
 		[HttpGet]
-		public ActionResult<List<Livro>> GetTodos()
+		public ActionResult<List<LivroExibicaoDto>> GetTodos()
 		{
-			return Ok(_context.Livros.Include(l => l.Categoria).ToList());
+			var livros = _context.Livros
+					.Select(l => new LivroExibicaoDto
+					{
+						Titulo = l.Titulo,
+						Autor = l.Autor,
+						CategoriaNome = l.Categoria?.Nome,
+						Estoque = l.Estoque,
+						Preco = l.Preco
+					})
+					.ToList();
+
+			return Ok(livros);
 		}
 
-		//Procura livros por ID
-		[HttpGet("{id:int}")]		
-		public ActionResult<Livro> GetPorId(int id)
+		//Procura livros por nome do título
+		[HttpGet("pesquisar-livro/{titulo}")]		
+		public ActionResult<List<LivroExibicaoDto>> GetPorNome(string titulo)
 		{
-			var livro = _context.Livros.FirstOrDefault(l => l.Id == id);
-			if (livro == null)
-			{
-				return NotFound("Livro não encontrado no banco de dados!");
-			}
-			return Ok(new { mensagem = "Livro encontrado!", livro });
-		}
+			var livro = _context.Livros
+				.Where(l => l.Titulo.ToLower().Contains(titulo.ToLower()))
+				.Select(l => new LivroExibicaoDto
+				{
+					Titulo = l.Titulo,
+					Autor = l.Autor,
+					Estoque = l.Estoque,
+					Preco = l.Preco,
+					CategoriaNome = l.Categoria.Nome
+				})
+				.ToList();
 
-		// Procura livros por Titulo
-		[HttpGet("BuscarTitulo/{titulo}")]		
-		public ActionResult<List<Livro>> GetPorTitulo(string titulo)
-		{
-			var livro = _context.Livros.Where(l => l.Titulo.ToLower().Contains(titulo.ToLower())).ToList();
 			if (livro.Count == 0)
 			{
-				return NotFound("Livro não encontrado!");
+				return NotFound($"Livro com titulo {titulo} não encontrado!");
 			}
-			return Ok(new { mensagem = "Livro encontrado!", livro });
-		}
 
+			return Ok(livro);
+		}
 
 		[HttpGet("preco-acima/{preco:decimal}")]
 		public ActionResult<List<Livro>> GetPorMaiorValor(decimal preco)
@@ -197,15 +207,11 @@ namespace Sebo_Andy.Controllers
 			});
 		}
 
+		// Mostra um DTO de livros que pertencem a categoria que for digitada
 		[HttpGet("pesquisar-categoria/{categoria}")]
-		public ActionResult GetPorNome(string categoria)
-		{
-			//var nomeCategoria = _context.Categorias.Where(c => c.Nome.ToLower().Contains(categoria.ToLower())).ToList();			
-			//var livroCategoria = _context.Livros
-			//	.Select(l => new LivroExibicaoDto { Nome = l.Categoria.Nome })
-			//	.ToList();
-
-			var nomeCategoria = _context.Livros
+		public ActionResult GetPorNomeCategoria(string categoria)
+		{			
+			var resultadoBusca = _context.Livros
 				.Where(c => c.Categoria.Nome.ToLower().Contains(categoria.ToLower()))
 				.Select(l => new LivroExibicaoDto{ 
 					CategoriaNome = l.Categoria.Nome,
@@ -215,7 +221,11 @@ namespace Sebo_Andy.Controllers
 					Preco = l.Preco})
 				.ToList();
 
-			return Ok(nomeCategoria);
+			if (resultadoBusca.Count == 0)
+			{
+				return NotFound($"Nenhum livro encontrado na categoria '{categoria}'.");
+			}
+			return Ok(resultadoBusca);
 		}
 	}
 }
