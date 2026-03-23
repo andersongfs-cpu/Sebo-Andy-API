@@ -4,6 +4,7 @@ using Sebo_Andy.Data;
 using Sebo_Andy.DTOs;
 using Sebo_Andy.Models;
 using Sebo_Andy.Services;
+using System.Linq;
 
 namespace Sebo_Andy.Controllers
 {
@@ -194,6 +195,27 @@ namespace Sebo_Andy.Controllers
 			mensagem = "Livro(s) Encontrado(s): ",
 			dados = livros
 			});
+		}
+
+		[HttpGet("pesquisar-categoria/{categoria}")]
+		public ActionResult GetPorNome(string categoria)
+		{
+			//var nomeCategoria = _context.Categorias.Where(c => c.Nome.ToLower().Contains(categoria.ToLower())).ToList();			
+			//var livroCategoria = _context.Livros
+			//	.Select(l => new LivroExibicaoDto { Nome = l.Categoria.Nome })
+			//	.ToList();
+
+			var nomeCategoria = _context.Livros
+				.Where(c => c.Categoria.Nome.ToLower().Contains(categoria.ToLower()))
+				.Select(l => new LivroExibicaoDto{ 
+					CategoriaNome = l.Categoria.Nome,
+					Titulo = l.Titulo,
+					Autor = l.Autor,
+					Estoque = l.Estoque,
+					Preco = l.Preco})
+				.ToList();
+
+			return Ok(nomeCategoria);
 		}
 	}
 }
