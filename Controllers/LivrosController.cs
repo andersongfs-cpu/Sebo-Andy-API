@@ -4,7 +4,6 @@ using Sebo_Andy.Data;
 using Sebo_Andy.DTOs;
 using Sebo_Andy.Models;
 using Sebo_Andy.Services;
-using System.Linq;
 
 namespace Sebo_Andy.Controllers
 {
@@ -23,27 +22,27 @@ namespace Sebo_Andy.Controllers
 
 		// Lista todos os livros
 		[HttpGet]
-		public ActionResult<List<LivroExibicaoDto>> GetTodos()
+		public async Task<ActionResult<List<LivroExibicaoDto>>> GetTodos()
 		{
-			var livros = _context.Livros
+			var livros = await _context.Livros
 					.Select(l => new LivroExibicaoDto
 					{
 						Titulo = l.Titulo,
 						Autor = l.Autor,
-						CategoriaNome = l.Categoria?.Nome,
+						CategoriaNome = l.Categoria != null ? l.Categoria.Nome : "Sem Categoria",
 						Estoque = l.Estoque,
 						Preco = l.Preco
 					})
-					.ToList();
+					.ToListAsync();
 
 			return Ok(livros);
 		}
 
 		//Procura livros por nome do título
 		[HttpGet("pesquisar-livro/{titulo}")]		
-		public ActionResult<List<LivroExibicaoDto>> GetPorNome(string titulo)
+		public async Task<ActionResult<List<LivroExibicaoDto>>> GetPorNome(string titulo)
 		{
-			var livro = _context.Livros
+			var livro = await _context.Livros
 				.Where(l => l.Titulo.ToLower().Contains(titulo.ToLower()))
 				.Select(l => new LivroExibicaoDto
 				{
@@ -51,9 +50,9 @@ namespace Sebo_Andy.Controllers
 					Autor = l.Autor,
 					Estoque = l.Estoque,
 					Preco = l.Preco,
-					CategoriaNome = l.Categoria.Nome
+					CategoriaNome = l.Categoria != null ? l.Categoria.Nome : "Sem Categoria"
 				})
-				.ToList();
+				.ToListAsync();
 
 			if (livro.Count == 0)
 			{
@@ -63,23 +62,36 @@ namespace Sebo_Andy.Controllers
 			return Ok(livro);
 		}
 
+		// Endpoint para pegar apenas livros acima do valor inserido
 		[HttpGet("preco-acima/{preco:decimal}")]
-		public ActionResult<List<Livro>> GetPorMaiorValor(decimal preco)
+		public async Task<ActionResult<List<LivroExibicaoDto>>> GetPorMaiorValor(decimal preco)
 		{
-			var livros = _context.Livros.Where(l => l.Preco >= preco).ToList();
+			var livros = await _context.Livros.Where(l => l.Preco >= preco).ToListAsync();
 			if (livros.Count == 0)
 			{
 				return NotFound($"Não há livros de valor igual ou acima de {preco:C2}");
 			}
-			return Ok(new { mensagem = "Livro(s) Encontrado(s)!", livros });
+
+			var livrosDto = livros
+				.Select(l => new LivroExibicaoDto
+				{
+					Titulo = l.Titulo,
+					Autor = l.Autor,
+					Estoque = l.Estoque,
+					Preco = l.Preco,
+					CategoriaNome = l.Categoria != null ? l.Categoria.Nome : "Sem categoria."
+				})
+				.ToList();
+
+			return Ok(new { mensagem = "Livro(s) Encontrado(s)!", livrosDto });
 		}
 
 		// Adiciona novo livro
 		[HttpPost]		
-		public ActionResult PostNovoLivro(LivroCriacaoDto livroDto, [FromHeader] int adminId)
+		public async Task<ActionResult> PostNovoLivro(LivroCriacaoDto livroDto, [FromHeader] int adminId)
 		{
 			// Verifica se usuário é admin
-			if (!_auth.EhAdmin(adminId)) return StatusCode(403, "Acesso negado! Apenas administradores podem adicionar livros!");
+			if (!await _auth.EhAdmin(adminId)) return StatusCode(403, "Acesso negado! Apenas administradores podem adicionar livros!");
 
 			// Se passar pela segurança, método segue normalmente
 			// Transforma o DTO numa entidade Livro
@@ -93,42 +105,43 @@ namespace Sebo_Andy.Controllers
 			};
 
 			_context.Livros.Add(novoLivro);
-			_context.SaveChanges();
+			await _context.SaveChangesAsync();
 
 			return Ok(new { mensagem = "Livro adicionado com sucesso via DTO!", dados = novoLivro });
 		}
 
+		// Endpoint para deletar um Livro
 		[HttpDelete("{id:int}")]
-		public IActionResult DeleteLivro(int id, [FromHeader] int adminId)
+		public async Task<IActionResult> DeleteLivro(int id, [FromHeader] int adminId)
 		{
 			//verifica se usuário é admin
-			if (!_auth.EhAdmin(adminId))
+			if (!await _auth.EhAdmin(adminId))
 			{
 				return StatusCode(403, "Acesso negado! Apenas administradores podem remover livros!");
 			}
 
-			var delLivro = _context.Livros.FirstOrDefault(l => l.Id == id);
+			var delLivro = await _context.Livros.FirstOrDefaultAsync(l => l.Id == id);
 			if (delLivro == null)
 			{
 				return NotFound("Livro não encontrado!");
 			}
 			_context.Livros.Remove(delLivro);
-			_context.SaveChanges();
+			await _context.SaveChangesAsync();
 			return Ok(new { mensagem = "Livro removido com sucesso!", delLivro });
 		}
 
 		// Edita um livro após a ID do mesmo ser inserida
 		[HttpPut("{id:int}")]
-		public IActionResult EditarLivro(int id, LivroAtualizacaoDto livroDto, [FromHeader] int adminId)
+		public async Task<IActionResult> EditarLivro(int id, LivroAtualizacaoDto livroDto, [FromHeader] int adminId)
 		{
 			//verifica se usuário é admin
-			if (!_auth.EhAdmin(adminId))
+			if (!await _auth.EhAdmin(adminId))
 			{
 				return StatusCode(403, "Acesso negado! Apenas administradores podem editar livros!");
 			}
 
 			// Pega o ID do livro que foi inserido no swagger
-			var livroOriginal = _context.Livros.FirstOrDefault(l => l.Id == id);
+			var livroOriginal = await _context.Livros.FirstOrDefaultAsync(l => l.Id == id);
 
 			// Verifica se o livro com o ID inserido existe
 			if (livroOriginal == null)
@@ -165,7 +178,7 @@ namespace Sebo_Andy.Controllers
 			if (livroDto.CategoriaId.HasValue)
 			{
 				// Verifica se a Id inserida pertence a alguma categoria existente
-				var existeId = _context.Categorias.Any(c => c.Id == livroDto.CategoriaId);
+				var existeId = await _context.Categorias.AnyAsync(c => c.Id == livroDto.CategoriaId);
 				if (!existeId)
 				{
 					return NotFound($"Erro: Categoria de Id {livroDto.CategoriaId} não encontrada!");
@@ -175,51 +188,23 @@ namespace Sebo_Andy.Controllers
 			}
 
 			// Salva as mudanças no Banco de Dados
-			_context.SaveChanges();
+			await _context.SaveChangesAsync();
 			return Ok(new { mensagem = $"Livro de ID {id} foi editado com sucesso!", dados = livroOriginal });
-		}
-
-		// Faz uma busca por livros da categoria inserida
-		[HttpGet("buscar-categoria/{id:int}")]
-		public ActionResult<List<Livro>> GetPorCategoria(int id)
-		{
-			// Verifica se a categoria existe
-			var existeCategoria = _context.Categorias.FirstOrDefault(c => c.Id == id);
-			if(existeCategoria == null)
-			{
-				return NotFound($"Categoria de Id {id} não existe!");
-			}
-			// Verifica se existem livros daquela categoria no Banco de Dados
-			var livros = _context.Livros
-						.Include(l => l.Categoria)
-						.Where(l => l.CategoriaId == id)
-						.ToList();
-			
-			// Se categoria existe, verifica se existem livros que pertencem a ela
-			if(livros.Count == 0)
-			{				
-				return Ok(new { mensagem = "Erro[200] Não existem livros pertencentes a categoria selecionada.", dados = existeCategoria });
-			}
-
-			return Ok(new{
-			mensagem = "Livro(s) Encontrado(s): ",
-			dados = livros
-			});
 		}
 
 		// Mostra um DTO de livros que pertencem a categoria que for digitada
 		[HttpGet("pesquisar-categoria/{categoria}")]
-		public ActionResult GetPorNomeCategoria(string categoria)
+		public async Task<ActionResult> GetPorNomeCategoria(string categoria)
 		{			
-			var resultadoBusca = _context.Livros
-				.Where(c => c.Categoria.Nome.ToLower().Contains(categoria.ToLower()))
+			var resultadoBusca = await _context.Livros
+				.Where(c => c.Categoria!.Nome.ToLower().Contains(categoria.ToLower()))
 				.Select(l => new LivroExibicaoDto{ 
-					CategoriaNome = l.Categoria.Nome,
+					CategoriaNome = l.Categoria != null ? l.Categoria.Nome : "Sem categoria!",
 					Titulo = l.Titulo,
 					Autor = l.Autor,
 					Estoque = l.Estoque,
 					Preco = l.Preco})
-				.ToList();
+				.ToListAsync();
 
 			if (resultadoBusca.Count == 0)
 			{

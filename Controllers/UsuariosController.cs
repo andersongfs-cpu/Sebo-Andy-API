@@ -1,14 +1,9 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
+using Sebo_Andy.Data;
 using Sebo_Andy.DTOs;
 using Sebo_Andy.Models;
-using Sebo_Andy.Data;
 using Sebo_Andy.Services;
-using Microsoft.Identity.Client;
-using System.Reflection.Metadata.Ecma335;
-using Microsoft.AspNetCore.Http.HttpResults;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Sebo_Andy.Controllers
 {
@@ -26,71 +21,100 @@ namespace Sebo_Andy.Controllers
 		}
 
 		[HttpGet]
-		public ActionResult GetTodos([FromHeader] int adminId)
+		public async Task<IActionResult> GetTodos([FromHeader] int adminId)
 		{
 			// Verifica cargo do usuario
-			if (_auth.EhAdmin(adminId))
+			if (await _auth.EhAdmin(adminId))
 			{
-				return Ok(_context.Usuarios.ToList());
-			};
+				var todosUsuarios = await _context.Usuarios.ToListAsync();
+				return Ok(todosUsuarios);
+			}
 
-			var usuariosDto = _context.Usuarios
-				.ToList()
-				.Select(u => new UsuarioGetDto{ Nome = u.Nome})
-				.ToList();
+			var usuariosDto = await _context.Usuarios				
+				.Select(u => new UsuarioGetDto
+				{ 
+					Nome = u.Nome, 
+					Email = u.Email, 
+					Cargo = u.Cargo.ToString()
+				})
+				.ToListAsync();
 			
 			return Ok(usuariosDto);
 		}
 
 		[HttpGet("{id:int}")]
-		public ActionResult<Usuario> GetPorId(int id)
+		public async Task<IActionResult> GetPorId(int id, [FromHeader] int usuarioId)
 		{
-			var usuario = _context.Usuarios.FirstOrDefault(u => u.Id == id);
-			if(usuario == null)
+			var usuario = await _context.Usuarios.FirstOrDefaultAsync(u => u.Id == id);
+
+			if (usuario == null)
 			{
-				return NotFound("Usuário não encontrado!");
+				return NotFound("Usuário não cadastrado no sistema.");
 			}
 
-			TipoCargo dados = usuario.Cargo;
-			string nomeCargo = dados.ToString();
+			if(await _auth.EhAdmin(usuarioId))
+			{
+				return Ok(usuario);
+			}
 
-			return Ok(new { mensagem = "Usuário Encontrado", usuario, nomeCargo});
+			var usuarioDto = new UsuarioGetDto
+			{
+				Nome = usuario.Nome,
+				Email = usuario.Email,
+				Cargo = usuario.Cargo.ToString()
+			};
+
+			return Ok(usuarioDto);
 		}
 
 		[HttpPost]
-		public IActionResult AddUsuario(Usuario novoUsuario)
+		public async Task<IActionResult> AddUsuario(UsuarioPostDto novoUsuarioDto, [FromHeader] int usuarioId)
 		{
-			_context.Usuarios.Add(novoUsuario);
-			_context.SaveChanges();
+			var usuarioParaSalvar = new Usuario
+			{
+				Nome = novoUsuarioDto.Nome,
+				Email = novoUsuarioDto.Email ?? "Sem email",
+				Cargo = TipoCargo.Cliente
+			};
 
-			return Ok(new{mensagem = "Usuário adicionado com sucesso!",	novoUsuario});
+			if (await _auth.EhAdmin(usuarioId))
+			{
+				usuarioParaSalvar.Cargo = novoUsuarioDto.Cargo;
+			}
+
+			_context.Usuarios.Add(usuarioParaSalvar);
+			await _context.SaveChangesAsync();
+
+			return Ok(usuarioParaSalvar);
 		}
 
 		[HttpDelete("{id:int}")]
-		public IActionResult DelUsuario(int id)
+		public async Task<IActionResult> DelUsuario(int id)
 		{
-			var removerUsuario = _context.Usuarios.FirstOrDefault(u => u.Id == id);
+			var removerUsuario = await _context.Usuarios.FirstOrDefaultAsync(u => u.Id == id);
 			if (removerUsuario == null)
 			{
 				return NotFound($"Usuário de Id {id} não encontrado!");
 			}
 
 			_context.Usuarios.Remove(removerUsuario);
-			_context.SaveChanges();
+			await _context.SaveChangesAsync();
 			return Ok(new {mensagem = $"Usuário de Id {id} foi removido com sucesso!", removerUsuario});
 		}
 
 		[HttpPut("{id:int}")]
-		public IActionResult EditUsuario(int id, Usuario editUsuario)
+		public async Task<IActionResult> EditUsuario(int id, Usuario editUsuario)
 		{
-			var atualUsuario = _context.Usuarios.FirstOrDefault(u => u.Id == id);
+			var atualUsuario = await _context.Usuarios.FirstOrDefaultAsync(u => u.Id == id);
 			if(atualUsuario == null)
 			{
 				return NotFound($"Usuário de Id {id} não encontrado!");
 			}
+
 			atualUsuario.Nome = editUsuario.Nome;
 			atualUsuario.Email = editUsuario.Email;
-			_context.SaveChanges();
+
+			await _context.SaveChangesAsync();
 			return Ok(new {mensagem = $"Usuário de Id {id} editado com sucesso!", atualUsuario });
 		}
 	}

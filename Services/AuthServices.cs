@@ -14,9 +14,9 @@ namespace Sebo_Andy.Services
 		}
 
 		//Método que verifica se o usuário é admin
-		public bool EhAdmin(int usuarioId)
+		public async Task<bool> EhAdmin(int usuarioId)
 		{
-			var usuario = _context.Usuarios.Find(usuarioId);
+			var usuario = await _context.Usuarios.FindAsync(usuarioId);
 			return usuario != null && usuario.Cargo == TipoCargo.Admin;
 		}
 	}
