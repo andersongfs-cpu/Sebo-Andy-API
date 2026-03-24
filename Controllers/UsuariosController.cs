@@ -1,5 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Sebo_Andy.Data;
 using Sebo_Andy.DTOs;
 using Sebo_Andy.Models;
@@ -67,20 +68,17 @@ namespace Sebo_Andy.Controllers
 			return Ok(usuarioDto);
 		}
 
+		[Authorize(Roles = "Admin")]
 		[HttpPost]
-		public async Task<IActionResult> AddUsuario(UsuarioPostDto novoUsuarioDto, [FromHeader] int usuarioId)
+		public async Task<IActionResult> AddUsuario(UsuarioPostDto novoUsuarioDto)
 		{
 			var usuarioParaSalvar = new Usuario
 			{
 				Nome = novoUsuarioDto.Nome,
-				Email = novoUsuarioDto.Email ?? "Sem email",
-				Cargo = TipoCargo.Cliente
+				Email = novoUsuarioDto.Email,
+				Senha = novoUsuarioDto.Senha,
+				Cargo = novoUsuarioDto.Cargo				
 			};
-
-			if (await _auth.EhAdmin(usuarioId))
-			{
-				usuarioParaSalvar.Cargo = novoUsuarioDto.Cargo;
-			}
 
 			_context.Usuarios.Add(usuarioParaSalvar);
 			await _context.SaveChangesAsync();
@@ -113,6 +111,8 @@ namespace Sebo_Andy.Controllers
 
 			atualUsuario.Nome = editUsuario.Nome;
 			atualUsuario.Email = editUsuario.Email;
+			atualUsuario.Senha = editUsuario.Senha;
+			atualUsuario.Cargo = editUsuario.Cargo;
 
 			await _context.SaveChangesAsync();
 			return Ok(new {mensagem = $"Usuário de Id {id} editado com sucesso!", atualUsuario });

@@ -6,7 +6,8 @@ namespace Sebo_Andy.DTOs
 	{
 		
 		public string Nome { get; set; } = string.Empty;
-		public string? Email { get; set; }
+		public string Email { get; set; } = string.Empty;
+		public string Senha { get; set; } = string.Empty;
 		public TipoCargo Cargo { get; set; } = TipoCargo.Cliente;
 	}
 }
