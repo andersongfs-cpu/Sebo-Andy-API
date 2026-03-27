@@ -22,9 +22,23 @@ namespace Sebo_Andy.Controllers
 
 		// Lista todos os livros
 		[HttpGet]
-		public async Task<ActionResult<List<LivroExibicaoDto>>> GetTodos()
+		[ProducesResponseType(typeof(List<LivroExibicaoDto>), StatusCodes.Status200OK)]
+		[ProducesResponseType(StatusCodes.Status404NotFound)]
+		public async Task<ActionResult<List<LivroExibicaoDto>>> GetTodos([FromQuery] string? titulo, [FromQuery] string? autor)
 		{
-			var livros = await _context.Livros
+			var query = _context.Livros.AsQueryable();
+
+			if (!string.IsNullOrWhiteSpace(titulo))
+			{
+				query = query.Where(l => l.Titulo.Contains(titulo));
+			}
+
+			if (!string.IsNullOrWhiteSpace(autor))
+			{
+				query = query.Where(l => l.Autor.Contains(autor));
+			}
+
+			var livros = await query
 					.Select(l => new LivroExibicaoDto
 					{
 						Titulo = l.Titulo,
@@ -35,59 +49,16 @@ namespace Sebo_Andy.Controllers
 					})
 					.ToListAsync();
 
+			if (livros.Count == 0)
+			{
+				return NotFound("Nenhum livro encontrado!");
+			}
+
 			return Ok(livros);
 		}
 
-		//Procura livros por nome do título
-		[HttpGet("pesquisar-livro/{titulo}")]		
-		public async Task<ActionResult<List<LivroExibicaoDto>>> GetPorNome(string titulo)
-		{
-			var livro = await _context.Livros
-				.Where(l => l.Titulo.ToLower().Contains(titulo.ToLower()))
-				.Select(l => new LivroExibicaoDto
-				{
-					Titulo = l.Titulo,
-					Autor = l.Autor,
-					Estoque = l.Estoque,
-					Preco = l.Preco,
-					CategoriaNome = l.Categoria != null ? l.Categoria.Nome : "Sem Categoria"
-				})
-				.ToListAsync();
-
-			if (livro.Count == 0)
-			{
-				return NotFound($"Livro com titulo {titulo} não encontrado!");
-			}
-
-			return Ok(livro);
-		}
-
-		// Endpoint para pegar apenas livros acima do valor inserido
-		[HttpGet("preco-acima/{preco:decimal}")]
-		public async Task<ActionResult<List<LivroExibicaoDto>>> GetPorMaiorValor(decimal preco)
-		{
-			var livros = await _context.Livros.Where(l => l.Preco >= preco).ToListAsync();
-			if (livros.Count == 0)
-			{
-				return NotFound($"Não há livros de valor igual ou acima de {preco:C2}");
-			}
-
-			var livrosDto = livros
-				.Select(l => new LivroExibicaoDto
-				{
-					Titulo = l.Titulo,
-					Autor = l.Autor,
-					Estoque = l.Estoque,
-					Preco = l.Preco,
-					CategoriaNome = l.Categoria != null ? l.Categoria.Nome : "Sem categoria."
-				})
-				.ToList();
-
-			return Ok(new { mensagem = "Livro(s) Encontrado(s)!", livrosDto });
-		}
-
 		// Adiciona novo livro
-		[HttpPost]		
+		[HttpPost]
 		public async Task<ActionResult> PostNovoLivro(LivroCriacaoDto livroDto, [FromHeader] int adminId)
 		{
 			// Verifica se usuário é admin
@@ -151,7 +122,7 @@ namespace Sebo_Andy.Controllers
 			// Se o ID existe, irá fazer DTO(Data Transfer Object) das seguintes propriedades:
 
 			// Só muda o titulo se for inserido algo diferente de Nulo, Vazio ou "string"
-			if (!string.IsNullOrWhiteSpace(livroDto.Titulo) && livroDto.Titulo != "string" )
+			if (!string.IsNullOrWhiteSpace(livroDto.Titulo) && livroDto.Titulo != "string")
 			{
 				livroOriginal.Titulo = livroDto.Titulo;
 			}
@@ -190,27 +161,6 @@ namespace Sebo_Andy.Controllers
 			// Salva as mudanças no Banco de Dados
 			await _context.SaveChangesAsync();
 			return Ok(new { mensagem = $"Livro de ID {id} foi editado com sucesso!", dados = livroOriginal });
-		}
-
-		// Mostra um DTO de livros que pertencem a categoria que for digitada
-		[HttpGet("pesquisar-categoria/{categoria}")]
-		public async Task<ActionResult> GetPorNomeCategoria(string categoria)
-		{			
-			var resultadoBusca = await _context.Livros
-				.Where(c => c.Categoria!.Nome.ToLower().Contains(categoria.ToLower()))
-				.Select(l => new LivroExibicaoDto{ 
-					CategoriaNome = l.Categoria != null ? l.Categoria.Nome : "Sem categoria!",
-					Titulo = l.Titulo,
-					Autor = l.Autor,
-					Estoque = l.Estoque,
-					Preco = l.Preco})
-				.ToListAsync();
-
-			if (resultadoBusca.Count == 0)
-			{
-				return NotFound($"Nenhum livro encontrado na categoria '{categoria}'.");
-			}
-			return Ok(resultadoBusca);
 		}
 	}
 }

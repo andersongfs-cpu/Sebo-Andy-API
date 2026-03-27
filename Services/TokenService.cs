@@ -6,9 +6,9 @@ using System.Text;
 
 namespace Sebo_Andy.Services
 {
-	public static class TokenService
+	public class TokenService
 	{
-		public static string GerarToken(Usuario usuario)
+		public string GerarToken(Usuario usuario)
 		{
 			var tokenHandler = new JwtSecurityTokenHandler();
 			

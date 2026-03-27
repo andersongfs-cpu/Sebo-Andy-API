@@ -30,6 +30,7 @@ builder.Services.AddAuthentication(x =>
 
 // Add services to the container.
 
+builder.Services.AddScoped<TokenService>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
