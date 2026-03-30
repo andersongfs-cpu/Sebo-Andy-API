@@ -70,7 +70,7 @@ namespace Sebo_Andy.Controllers
 		}
 
 		// Adiciona novo usuário
-		[Authorize(Roles = "Admin")]
+		[Authorize(Roles = "Admin,Funcionario")]
 		[HttpPost]
 		[ProducesResponseType(StatusCodes.Status201Created)]		// Novo usuário criado
 		[ProducesResponseType(StatusCodes.Status401Unauthorized)]	// Não fez login
