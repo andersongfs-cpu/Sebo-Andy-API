@@ -13,14 +13,14 @@ namespace Sebo_Andy.Controllers
 	public class UsuariosController : ControllerBase
 	{
 		private readonly AppDbContext _context;
-		private readonly AuthServices _auth;
 
-		public UsuariosController(AppDbContext context, AuthServices auth)
+		public UsuariosController(AppDbContext context)
 		{
 			_context = context;
-			_auth = auth;
 		}
 
+		// Lista usuários usando Querys
+		[Authorize(Roles = "Admin,Funcionario")]
 		[HttpGet]
 		[ProducesResponseType(typeof(List<UsuarioGetDto>), StatusCodes.Status200OK)]
 		[ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -69,11 +69,12 @@ namespace Sebo_Andy.Controllers
 			return Ok(usuariosDto);
 		}
 
+		// Adiciona novo usuário
 		[Authorize(Roles = "Admin")]
 		[HttpPost]
-		[ProducesResponseType(StatusCodes.Status201Created)]
-		[ProducesResponseType(StatusCodes.Status401Unauthorized)]
-		[ProducesResponseType(StatusCodes.Status403Forbidden)]
+		[ProducesResponseType(StatusCodes.Status201Created)]		// Novo usuário criado
+		[ProducesResponseType(StatusCodes.Status401Unauthorized)]	// Não fez login
+		[ProducesResponseType(StatusCodes.Status403Forbidden)]		// Fez login, mas não tem autoridade pra criar novo usuário
 		public async Task<IActionResult> AddUsuario(UsuarioPostDto novoUsuarioDto)
 		{
 			string senhaComHash = BCrypt.Net.BCrypt.HashPassword(novoUsuarioDto.Senha);
@@ -92,7 +93,13 @@ namespace Sebo_Andy.Controllers
 			return Ok(usuarioParaSalvar);
 		}
 
+		// Deleta usuário pela ID
+		[Authorize(Roles = "Admin")]
 		[HttpDelete("{id}")]
+		[ProducesResponseType(StatusCodes.Status204NoContent)]
+		[ProducesResponseType(StatusCodes.Status401Unauthorized)]
+		[ProducesResponseType(StatusCodes.Status403Forbidden)]
+		[ProducesResponseType(StatusCodes.Status404NotFound)]
 		public async Task<IActionResult> DelUsuario(int id)
 		{
 			var removerUsuario = await _context.Usuarios.FindAsync(id);
@@ -108,6 +115,8 @@ namespace Sebo_Andy.Controllers
 			return NoContent();
 		}
 
+		// Edita usuário pela ID
+		[Authorize(Roles = "Admin")]
 		[HttpPut("{id}")]
 		[ProducesResponseType(StatusCodes.Status204NoContent)]
 		[ProducesResponseType(StatusCodes.Status404NotFound)]

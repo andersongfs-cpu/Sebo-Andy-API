@@ -1,6 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Sebo_Andy.Data;
+using Sebo_Andy.DTOs;
 using Sebo_Andy.Models;
 using Sebo_Andy.Services;
 
@@ -12,95 +14,102 @@ namespace Sebo_Andy.Controllers
 	public class CategoriasController : ControllerBase
 	{
 		private readonly AppDbContext _context;
-		private readonly AuthServices _auth;
-
-		public CategoriasController(AppDbContext context, AuthServices auth)
+		public CategoriasController(AppDbContext context)
 		{
 			_context = context;
-			_auth = auth;
 		}
 
 		// Método para listar as categorias de livros cadastradas.
 		[HttpGet]
-		public ActionResult<List<Categoria>> GetTodos()
+		[ProducesResponseType(typeof(List<CategoriaDto>), StatusCodes.Status200OK)]		
+		public async Task<ActionResult<List<CategoriaDto>>> GetTodos([FromQuery] int? id, [FromQuery] string? nome)
 		{
-			return Ok(new
+			var query = _context.Categorias.AsQueryable();
+
+			if (id.HasValue)
 			{
-				mensagem = "Lista de categorias.",
-				categorias = _context.Categorias.ToList()
-			});
+				query = query.Where(c => c.Id == id);
+			}
+			if (!string.IsNullOrWhiteSpace(nome))
+			{
+				query = query.Where(c => c.Nome.Contains(nome));
+			}
+
+			var categorias = await query
+			.Select(c => new CategoriaDto
+			{
+				Nome = c.Nome
+			})
+			.ToListAsync();
+
+			if (categorias.Count == 0)
+			{
+				return Ok(new List<CategoriaDto>());
+			}
+
+			return Ok(categorias);
 		}
 
 		// Método para adicionar uma nova categoria
+		[Authorize(Roles = "Admin")]
 		[HttpPost]
-		public async Task<ActionResult> PostNovaCategoria(Categoria novaCategoria, [FromHeader] int adminId)
+		[ProducesResponseType(StatusCodes.Status201Created)]
+		[ProducesResponseType(StatusCodes.Status401Unauthorized)]
+		[ProducesResponseType(StatusCodes.Status403Forbidden)]
+		public async Task<IActionResult> PostNovaCategoria(CategoriaDto categoriaDto)
 		{
-			// Verifica se o usuário é admin através do AuthService.cs // ! = diferente de
-			if (!await _auth.EhAdmin(adminId))
+			var novaCategoria = new Categoria
 			{
-				return StatusCode(403, "Acesso negado! Apenas administradores podem adicionar novas categorias!");
-			}
-			// Se usuário = admin código continua
-			_context.Categorias.Add(novaCategoria);
-			_context.SaveChanges();
+				Nome = categoriaDto.Nome
+			};
 
-			return Ok(new
-			{
-				mensagem = "Categoria adicionada com sucesso!",
-				dados = novaCategoria
-			});
+			_context.Categorias.Add(novaCategoria);
+			await _context.SaveChangesAsync();
+
+			return Created(string.Empty, novaCategoria);
 		}
 
+		// Endpoint para remover categoria via ID
+		[Authorize(Roles = "Admin")]
 		[HttpDelete("{id:int}")]
-		public async Task<ActionResult> DeleteCategoria(int id, [FromHeader] int adminId)
+		[ProducesResponseType(StatusCodes.Status204NoContent)]
+		[ProducesResponseType(StatusCodes.Status401Unauthorized)]
+		[ProducesResponseType(StatusCodes.Status403Forbidden)]
+		[ProducesResponseType(StatusCodes.Status404NotFound)]
+		public async Task<IActionResult> DeleteCategoria(int id)
 		{
-			// Verifica se o usuário é admin através do AuthService.cs // ! = diferente de
-			if (!await _auth.EhAdmin(adminId))
-			{
-				return StatusCode(403, "Acesso negado! Apenas administradores podem excluir categorias!");
-			}
-			// Se usuário = admin código continua			
-			var delCategoria = _context.Categorias.FirstOrDefault(c => c.Id == id);
+			var delCategoria = await _context.Categorias.FindAsync(id);
 			if (delCategoria == null)
 			{
 				return NotFound("Categoria não encontrada!");
 			}
-			string nomeCategoria = delCategoria.Nome;
+			
 			_context.Categorias.Remove(delCategoria);
-			_context.SaveChanges();
-			return Ok(new { mensagem = $"Categoria {nomeCategoria} removida com sucesso!" });
+			await _context.SaveChangesAsync();
+			return NoContent();
 		}
 
+		[Authorize(Roles = "Admin")]
 		[HttpPut("{id:int}")]
-		public async Task<ActionResult> EditarCategoria(int id, [FromHeader] int adminId, Categoria categoriaAtt)
+		[ProducesResponseType(StatusCodes.Status404NotFound)]
+		[ProducesResponseType(StatusCodes.Status204NoContent)]
+		[ProducesResponseType(StatusCodes.Status401Unauthorized)]
+		[ProducesResponseType(StatusCodes.Status403Forbidden)]
+		public async Task<IActionResult> EditarCategoria(int id, CategoriaDto categoriaAtt)
 		{
-			// Verifica se o usuário é admin através do AuthService.cs // ! = diferente de
-			if (!await _auth.EhAdmin(adminId))
-			{
-				return StatusCode(403, "Acesso Negado! Apenas administradores podem editar categorias!");
-			}
-
-			// Se usuário = admin código continua
-			var categoriaOriginal = await _context.Categorias.FirstOrDefaultAsync(c => c.Id == id);
+			var categoriaOriginal = await _context.Categorias.FindAsync(id);
 			if (categoriaOriginal == null)
 			{
 				return NotFound("Categoria não encontrada!");
 			}
 
-			// Guarda o nome antigo
-			string nomeCategoria = categoriaOriginal.Nome;
-
-			// Aplica alteração
-			categoriaOriginal.Nome = categoriaAtt.Nome;
-
-			// Salva alterações no banco de dados
-			await _context.SaveChangesAsync();
-
-			return Ok(new
+			if (!string.IsNullOrWhiteSpace(categoriaAtt.Nome))
 			{
-				mensagem = $"Categoria {nomeCategoria} foi alterada para {categoriaOriginal.Nome} com sucesso!",
-				dados = categoriaOriginal
-			});			
+				categoriaOriginal.Nome = categoriaAtt.Nome;
+			}
+
+			await _context.SaveChangesAsync();
+			return NoContent();			
 		}
 	}
 }
