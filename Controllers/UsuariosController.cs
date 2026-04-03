@@ -78,7 +78,6 @@ namespace Sebo_Andy.Controllers
 		public async Task<IActionResult> AddUsuario(UsuarioPostDto novoUsuarioDto)
 		{
 			string senhaComHash = BCrypt.Net.BCrypt.HashPassword(novoUsuarioDto.Senha);
-
 			var usuarioParaSalvar = new Usuario
 			{
 				Nome = novoUsuarioDto.Nome,
